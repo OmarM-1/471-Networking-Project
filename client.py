@@ -1,9 +1,34 @@
 import socket
+from threading import Thread
+import os
 
-client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-client.connect(("localhost", 9999))
-input_message = input("Enter message to send: ")
-client.send(input_message.encode())
-data = client.recv(1024)
-print(f"Received from server: {data.decode()}") 
-client.close()
+class Client:
+
+    def __init__(self, HOST, PORT):
+        self.socket = socket.socket()
+        self.socket.connect((HOST, PORT))
+        self.name = input("Enter your name: ")
+        self.talk_to_server()
+
+
+    def talk_to_server(self):
+        self.socket.send(self.name.encode())
+        Thread(target=self.receive_messages).start()
+        self.send_message()
+
+    def send_message(self):
+        while True:
+            client_input = input("")
+            client_message = self.name + ": " + client_input
+            self.socket.send(client_message.encode())
+
+    def receive_messages(self):
+        while True:
+            server_message = self.socket.recv(1024).decode()
+            if not server_message.strip():
+                os._exit(0)
+            print("\033[1;31;40m" + server_message + "\033[0m")
+
+
+if __name__ == "__main__":
+    Client('localhost', 12345)
