@@ -3,6 +3,8 @@ Multi-Client FTP Socket Program
 Names and email addresses of all
 - Omar Montes | 621omontes@csu.fullerton.edu
 
+- Batu Demirtaş batudemirtas@csu.fullerton.edu
+
 The programming language you use (e.g. C++, Java, or Python)
 - Python
 

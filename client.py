@@ -4,9 +4,9 @@ import os
 
 class Client:
 
-    def __init__(self, HOST, PORT):
+    def __init__(self, host, port):
         self.socket = socket.socket()
-        self.socket.connect((HOST, PORT))
+        self.socket.connect((host, port))
         self.name = input("Enter your name: ")
         self.talk_to_server()
 
@@ -14,13 +14,16 @@ class Client:
     def talk_to_server(self):
         self.socket.send(self.name.encode())
         Thread(target=self.receive_messages).start()
+        print("connection successful, type 'bye' to exit:")
         self.send_message()
 
     def send_message(self):
         while True:
-            client_input = input("")
+            client_input = input(f"{self.name}: ")
             client_message = self.name + ": " + client_input
             self.socket.send(client_message.encode())
+            if client_input.strip().lower() == "bye":
+                break
 
     def receive_messages(self):
         while True:
@@ -31,4 +34,8 @@ class Client:
 
 
 if __name__ == "__main__":
-    Client('localhost', 12345)
+    print("=== Chat Client ===")
+    HOST = input("Enter server IP (press Enter for localhost): ").strip() or 'localhost'
+    PORT = 12345
+    print(f"Connecting to {HOST}:{PORT}...")
+    Client(HOST, PORT)
