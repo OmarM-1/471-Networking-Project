@@ -8,6 +8,7 @@ Names and email addresses of all
 - Swayam Shree | sswayam@csu.fullerton.edu
 
 - Ian Martines | b.ianmartinez98@csu.fullerton.edu
+
 The programming language you use (e.g. C++, Java, or Python)
 - Python
 
