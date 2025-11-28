@@ -5,6 +5,8 @@ Names and email addresses of all
 
 - Batu Demirtaş batudemirtas@csu.fullerton.edu
 
+- Swayam Shree | sswayam@csu.fullerton.edu
+
 The programming language you use (e.g. C++, Java, or Python)
 - Python
 
