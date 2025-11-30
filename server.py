@@ -12,6 +12,9 @@ class Server:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # TCP socket to allow 5 connections maximum.
         self.socket.bind((HOST, PORT))
         self.socket.listen(5)
+        self.server_directory = './server_files'
+        if not os.path.exists(self.server_directory):
+            os.makedirs(self.server_directory)
         print(f"Server started on {HOST}:{PORT}")
 
 
@@ -45,17 +48,20 @@ class Server:
                     client_socket.close()
                     break
                 elif client_message.strip() == "/ls":
-                    files = [f for f in os.listdir('.') if not f.startswith('.')]
+                    files = [f for f in os.listdir(self.server_directory) if not f.startswith('.')]
                     filelist = "\n".join(files) if files else "(no files)"
                     client_socket.send(filelist.encode(ENC))
                     continue
                 elif client_message.startswith("/get"):
                     _, filename = client_message.split(" ", 1)
-                    if not os.path.exists(filename) or not os.path.isfile(filename):
+
+                    filepath = os.path.join(self.server_directory, filename)
+
+                    if not os.path.exists(filepath) or not os.path.isfile(filepath):
                         client_socket.send("NOT_FOUND".encode(ENC))
                         continue
 
-                    filesize = os.path.getsize(filename)
+                    filesize = os.path.getsize(filepath)
                     client_socket.send(f"FOUND {filesize}".encode(ENC)) 
 
                     data_port_msg = client_socket.recv(1024).decode(ENC).strip()
@@ -65,7 +71,7 @@ class Server:
                     data_socket.connect(('localhost', data_port))
 
 
-                    with open(filename, "rb") as f:
+                    with open(filepath, "rb") as f:
                         while True:
                             chunk = f.read(BUFFER_SIZE)
                             if not chunk:

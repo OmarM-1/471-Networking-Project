@@ -12,9 +12,11 @@ class Client:
         self.socket.connect((HOST, PORT))
         self.name = input("Enter your name: ")
         self.talk_to_server()
+
+        self.client_directory = './client_files'
+        if not os.path.exists(self.client_directory):
+            os.makedirs(self.client_directory)
     
-
-
 
     def talk_to_server(self):
         self.socket.send(self.name.encode())
@@ -60,14 +62,15 @@ class Client:
                     conn.close()
                     data_socket.close()
 
-                    with open(filename, "wb") as f:
+                    filepath = os.path.join(self.client_directory, filename)
+                    with open(filepath, "wb") as f:
                         f.write(file_bytes)
-                    print(f"Downloaded {filename} ({filesize} bytes)")
+                    print(f"Downloaded {filename} ({filesize} bytes) to {self.client_directory}/")
+
                     continue
             if client_input.startswith("/put "):
                    continue 
                     
-
 
             client_message = self.name + ": " + client_input
             self.socket.send(client_message.encode())
