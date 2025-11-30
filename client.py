@@ -2,6 +2,9 @@ import socket
 from threading import Thread
 import os
 
+BUFFER_SIZE = 4096
+ENC = 'utf-8'
+
 class Client:
 
     def __init__(self, HOST, PORT):
@@ -9,6 +12,8 @@ class Client:
         self.socket.connect((HOST, PORT))
         self.name = input("Enter your name: ")
         self.talk_to_server()
+    
+
 
 
     def talk_to_server(self):
@@ -19,6 +24,51 @@ class Client:
     def send_message(self):
         while True:
             client_input = input("")
+
+            if client_input.startswith("/ls"):
+                self.socket.send(b"/ls")
+                continue
+            if client_input.startswith("/get "):
+                _, filename = client_input.split(" ", 1)
+                filename = filename.strip()
+                self.socket.send(f"/get {filename}".encode(ENC))
+
+                status = self.socket.recv(1024).decode(ENC).strip()
+                if status == "NOT_FOUND":
+                    print("Server: file not found.")
+                    continue
+
+                if status.startswith("FOUND "):
+                    filesize = int(status.split(" ", 1)[1])
+
+                    data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    data_socket.bind(('localhost', 0))  
+                    data_socket.listen(1)
+                    data_port = data_socket.getsockname()[1]
+
+                    self.socket.send(str(data_port).encode(ENC))
+
+                    conn, _ = data_socket.accept()
+
+                    file_bytes = b''
+                    while len(file_bytes) < filesize:
+                        chunk = conn.recv(min(BUFFER_SIZE, filesize - len(file_bytes)))
+                        if not chunk:
+                            break
+                        file_bytes += chunk
+                    
+                    conn.close()
+                    data_socket.close()
+
+                    with open(filename, "wb") as f:
+                        f.write(file_bytes)
+                    print(f"Downloaded {filename} ({filesize} bytes)")
+                    continue
+            if client_input.startswith("/put "):
+                   continue 
+                    
+
+
             client_message = self.name + ": " + client_input
             self.socket.send(client_message.encode())
 

@@ -1,6 +1,9 @@
 import socket   
 from threading import Thread
+import os
 
+BUFFER_SIZE = 4096      
+ENC = 'utf-8'
 
 class Server: 
     Clients = []
@@ -12,17 +15,22 @@ class Server:
         print(f"Server started on {HOST}:{PORT}")
 
 
-    def listen(self):
-        while True:
-            client_socket, address = self.socket.accept()
-            print(f"Connection with" + str(address) + " has been established.")
+    def listen  (self):
+        try:
+            while True:
+                client_socket, address = self.socket.accept()
+                print(f"Connection with" + str(address) + " has been established.")
 
-            client_name = client_socket.recv(1024).decode()
-            client = {'client_name': client_name, 'client_socket': client_socket}
+                client_name = client_socket.recv(1024).decode()
+                client = {'client_name': client_name, 'client_socket': client_socket}
 
-            self.broadcast_message(client_name, client_name + " has joined the chat.")
-            self.Clients.append(client)
-            Thread(target = self.handle_new_client, args=(client,)).start()
+                self.broadcast_message(client_name, client_name + " has joined the chat.")
+                self.Clients.append(client)
+                Thread(target = self.handle_new_client, args=(client,)).start()
+        except KeyboardInterrupt:
+            print("Shutting down")
+        finally:
+            self.socket.close
 
 
     def handle_new_client(self, client):
@@ -36,6 +44,37 @@ class Server:
                     Server.Clients.remove(client)
                     client_socket.close()
                     break
+                elif client_message.strip() == "/ls":
+                    files = [f for f in os.listdir('.') if not f.startswith('.')]
+                    filelist = "\n".join(files) if files else "(no files)"
+                    client_socket.send(filelist.encode(ENC))
+                    continue
+                elif client_message.startswith("/get"):
+                    _, filename = client_message.split(" ", 1)
+                    if not os.path.exists(filename) or not os.path.isfile(filename):
+                        client_socket.send("NOT_FOUND".encode(ENC))
+                        continue
+
+                    filesize = os.path.getsize(filename)
+                    client_socket.send(f"FOUND {filesize}".encode(ENC)) 
+
+                    data_port_msg = client_socket.recv(1024).decode(ENC).strip()
+                    data_port = int(data_port_msg)
+
+                    data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    data_socket.connect(('localhost', data_port))
+
+
+                    with open(filename, "rb") as f:
+                        while True:
+                            chunk = f.read(BUFFER_SIZE)
+                            if not chunk:
+                                break
+                            data_socket.sendall(chunk)
+                    data_socket.close()
+                    print(f"Sent {filename} to {client_name} via data connection")
+                    continue
+
                 else:
                     self.broadcast_message(client_name, client_message)
 
