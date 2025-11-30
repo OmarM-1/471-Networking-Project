@@ -54,6 +54,8 @@ class Server:
                     continue
                 elif client_message.startswith("/get"):
                     _, filename = client_message.split(" ", 1)
+                    filename = filename.strip()
+
 
                     filepath = os.path.join(self.server_directory, filename)
 
@@ -80,6 +82,36 @@ class Server:
                     data_socket.close()
                     print(f"Sent {filename} to {client_name} via data connection")
                     continue
+                elif client_message.startswith("/put"):
+                    # Extract filename and filesize
+                    parts = client_message.split(" ", 2)
+                    filename = parts[1]
+                    filesize = int(parts[2])
+                    
+                    # Get data port from client
+                    data_port = int(client_socket.recv(1024).decode(ENC))
+                    
+                    # Connect to client's data socket
+                    data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    data_socket.connect(('localhost', data_port))
+                    
+                    # Receive file data
+                    file_bytes = b''
+                    while len(file_bytes) < filesize:
+                        chunk = data_socket.recv(min(BUFFER_SIZE, filesize - len(file_bytes)))
+                        if not chunk:
+                            break
+                        file_bytes += chunk
+                    
+                    # Save file to server directory
+                    filepath = os.path.join(self.server_directory, filename)
+                    with open(filepath, "wb") as f:
+                        f.write(file_bytes)
+                    
+                    data_socket.close()
+                    client_socket.send(f"File {filename} uploaded successfully".encode(ENC))
+                    print(f"Received {filename} from {client_name} via data connection")
+                    continue
 
                 else:
                     self.broadcast_message(client_name, client_message)
@@ -89,7 +121,7 @@ class Server:
             client_socket = client['client_socket']
             client_name = client['client_name']
             if client_name != sender_name:
-                client_socket.send(message.encode())
+                client_socket.send(f"CHAT:{message}".encode())
 
 
 if __name__ == "__main__":
