@@ -9,7 +9,7 @@ class Server:
     Clients = []
 
     def __init__(self, HOST, PORT):
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # TCP socket to allow 5 connections maximum.
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.bind((HOST, PORT))
         self.socket.listen(5)
         self.server_directory = './server_files'
@@ -17,8 +17,7 @@ class Server:
             os.makedirs(self.server_directory)
         print(f"Server started on {HOST}:{PORT}")
 
-
-    def listen  (self):
+    def listen(self):
         try:
             while True:
                 client_socket, address = self.socket.accept()
@@ -29,91 +28,82 @@ class Server:
 
                 self.broadcast_message(client_name, client_name + " has joined the chat.")
                 self.Clients.append(client)
-                Thread(target = self.handle_new_client, args=(client,)).start()
+                Thread(target=self.handle_new_client, args=(client,)).start()
         except KeyboardInterrupt:
             print("Shutting down")
         finally:
-            self.socket.close
-
+            self.socket.close()
 
     def handle_new_client(self, client):
         client_socket = client['client_socket']
         client_name = client['client_name']
 
         while True:
-                client_message = client_socket.recv(1024).decode()
-                if client_message.strip() == client_name + ": bye" or not client_message.strip():
-                    self.broadcast_message(client_name, client_name + " has left the chat.")
-                    Server.Clients.remove(client)
-                    client_socket.close()
-                    break
-                elif client_message.strip() == "/ls":
-                    files = [f for f in os.listdir(self.server_directory) if not f.startswith('.')]
-                    filelist = "\n".join(files) if files else "(no files)"
-                    client_socket.send(filelist.encode(ENC))
-                    continue
-                elif client_message.startswith("/get"):
-                    _, filename = client_message.split(" ", 1)
-                    filename = filename.strip()
+            client_message = client_socket.recv(1024).decode()
+            if client_message.strip() == client_name + ": bye" or not client_message.strip():
+                self.broadcast_message(client_name, client_name + " has left the chat.")
+                Server.Clients.remove(client)
+                client_socket.close()
+                break
+            elif client_message.strip() == "/ls":
+                files = [f for f in os.listdir(self.server_directory) if not f.startswith('.')]
+                filelist = "\n".join(files) if files else "(no files)"
+                client_socket.send(filelist.encode(ENC))
+                continue
+            elif client_message.startswith("/get"):
+                _, filename, data_port_str = client_message.split(" ", 2)
+                filename = filename.strip()
+                data_port = int(data_port_str)
 
 
-                    filepath = os.path.join(self.server_directory, filename)
+                filepath = os.path.join(self.server_directory, filename)
 
-                    if not os.path.exists(filepath) or not os.path.isfile(filepath):
-                        client_socket.send("NOT_FOUND".encode(ENC))
-                        continue
+                data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                data_socket.connect(('localhost', data_port))
 
-                    filesize = os.path.getsize(filepath)
-                    client_socket.send(f"FOUND {filesize}".encode(ENC)) 
-
-                    data_port_msg = client_socket.recv(1024).decode(ENC).strip()
-                    data_port = int(data_port_msg)
-
-                    data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                    data_socket.connect(('localhost', data_port))
-
-
-                    with open(filepath, "rb") as f:
-                        while True:
-                            chunk = f.read(BUFFER_SIZE)
-                            if not chunk:
-                                break
-                            data_socket.sendall(chunk)
+                if not os.path.exists(filepath) or not os.path.isfile(filepath):
+                    data_socket.send("NOT_FOUND".encode(ENC))
                     data_socket.close()
-                    print(f"Sent {filename} to {client_name} via data connection")
                     continue
-                elif client_message.startswith("/put"):
-                    # Extract filename and filesize
-                    parts = client_message.split(" ", 2)
-                    filename = parts[1]
-                    filesize = int(parts[2])
-                    
-                    # Get data port from client
-                    data_port = int(client_socket.recv(1024).decode(ENC))
-                    
-                    # Connect to client's data socket
-                    data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                    data_socket.connect(('localhost', data_port))
-                    
-                    # Receive file data
-                    file_bytes = b''
-                    while len(file_bytes) < filesize:
-                        chunk = data_socket.recv(min(BUFFER_SIZE, filesize - len(file_bytes)))
+
+                filesize = os.path.getsize(filepath)
+                data_socket.send(f"FOUND {filesize}".encode(ENC)) 
+
+
+                with open(filepath, "rb") as f:
+                    while True:
+                        chunk = f.read(BUFFER_SIZE)
                         if not chunk:
                             break
-                        file_bytes += chunk
-                    
-                    # Save file to server directory
-                    filepath = os.path.join(self.server_directory, filename)
-                    with open(filepath, "wb") as f:
-                        f.write(file_bytes)
-                    
-                    data_socket.close()
-                    client_socket.send(f"File {filename} uploaded successfully".encode(ENC))
-                    print(f"Received {filename} from {client_name} via data connection")
-                    continue
-                else:
-                    self.broadcast_message(client_name, client_message)
+                        data_socket.sendall(chunk)
+                data_socket.close()
+                print(f"Sent {filename} to {client_name} via data connection")
+                continue
+            elif client_message.startswith("/put"):
+                parts = client_message.split(" ", 3)
+                filename = parts[1]
+                filesize = int(parts[2])
+                data_port = int(parts[3])
+                
+                data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                data_socket.connect(('localhost', data_port))
+                
+                file_bytes = b''
+                while len(file_bytes) < filesize:
+                    chunk = data_socket.recv(min(BUFFER_SIZE, filesize - len(file_bytes)))
+                    if not chunk:
+                        break
+                    file_bytes += chunk
+                
+                filepath = os.path.join(self.server_directory, filename)
+                with open(filepath, "wb") as f:
+                    f.write(file_bytes)
+                
+                data_socket.close()
+                print(f"Received {filename} from {client_name} via data connection")
+                continue
+            else:
+                self.broadcast_message(client_name, client_message)
 
     def broadcast_message(self, sender_name, message):
         for client in self.Clients:

@@ -52,42 +52,28 @@ class Client:
                 continue
                 
             if client_input.startswith("/get "):
-                self.ftp_mode = True
-                time.sleep(0.05) 
                 _, filename = client_input.split(" ", 1)
                 filename = filename.strip()
-                self.socket.send(f"/get {filename}".encode(ENC))
 
-    
-                status = None
-                for _ in range(50):
-                    try:
-                        status = self.socket.recv(1024).decode(ENC).strip()
-                        break
-                    except socket.timeout:
-                        continue
+                data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                data_socket.bind(('localhost', 0))  
+                data_socket.listen(1)
+                data_port = data_socket.getsockname()[1]
+
+                self.socket.send(f"/get {filename} {data_port}".encode(ENC))
+
+                conn, _ = data_socket.accept()
+
+                status = conn.recv(1024).decode(ENC).strip()
                 
-                if not status:
-                    print("No response from server")
-                    self.ftp_mode = False
-                    continue
-                    
                 if status == "NOT_FOUND":
                     print("Server: file not found.")
-                    self.ftp_mode = False
+                    conn.close()
+                    data_socket.close()
                     continue
 
                 if status.startswith("FOUND "):
                     filesize = int(status.split(" ", 1)[1])
-
-                    data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                    data_socket.bind(('localhost', 0))  
-                    data_socket.listen(1)
-                    data_port = data_socket.getsockname()[1]
-
-                    self.socket.send(str(data_port).encode(ENC))
-
-                    conn, _ = data_socket.accept()
 
                     file_bytes = b''
                     while len(file_bytes) < filesize:
@@ -103,12 +89,9 @@ class Client:
                     with open(filepath, "wb") as f:
                         f.write(file_bytes)
                     print(f"Downloaded {filename} ({filesize} bytes) to {self.client_directory}/")
-                    
-                self.ftp_mode = False
                 continue
                     
             if client_input.startswith("/put "):
-
                 _, filename = client_input.split(" ", 1)
                 filename = filename.strip()
                 filepath = os.path.join(self.client_directory, filename)
@@ -118,14 +101,13 @@ class Client:
                     continue
                 
                 filesize = os.path.getsize(filepath)
-                self.socket.send(f"/put {filename} {filesize}".encode(ENC))
                 
                 data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 data_socket.bind(('localhost', 0))
                 data_socket.listen(1)
                 data_port = data_socket.getsockname()[1]
                 
-                self.socket.send(str(data_port).encode(ENC))
+                self.socket.send(f"/put {filename} {filesize} {data_port}".encode(ENC))
                 
                 conn, _ = data_socket.accept()
                 
