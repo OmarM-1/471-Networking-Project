@@ -10,12 +10,14 @@ class Client:
     def __init__(self, HOST, PORT):
         self.socket = socket.socket()
         self.socket.connect((HOST, PORT))
-        self.name = input("Enter your name: ")
-        self.talk_to_server()
-
-        self.client_directory = './client_files'
+        
+        # Initialize client_directory BEFORE calling talk_to_server
+        self.client_directory = 'client_files'
         if not os.path.exists(self.client_directory):
             os.makedirs(self.client_directory)
+        
+        self.name = input("Enter your name: ")
+        self.talk_to_server()
     
 
     def talk_to_server(self):
@@ -69,7 +71,37 @@ class Client:
 
                     continue
             if client_input.startswith("/put "):
-                   continue 
+                _, filename = client_input.split(" ", 1)
+                filename = filename.strip()
+                filepath = os.path.join(self.client_directory, filename)
+                
+                if not os.path.exists(filepath):
+                    print(f"File '{filename}' not found in client directory.")
+                    continue
+                
+                filesize = os.path.getsize(filepath)
+                self.socket.send(f"/put {filename} {filesize}".encode(ENC))
+                
+                data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                data_socket.bind(('localhost', 0))
+                data_socket.listen(1)
+                data_port = data_socket.getsockname()[1]
+                
+                self.socket.send(str(data_port).encode(ENC))
+                
+                conn, _ = data_socket.accept()
+                
+                with open(filepath, "rb") as f:
+                    while True:
+                        chunk = f.read(BUFFER_SIZE)
+                        if not chunk:
+                            break
+                        conn.send(chunk)
+                
+                conn.close()
+                data_socket.close()
+                print(f"Uploaded {filename} ({filesize} bytes) to server")
+                continue
                     
 
             client_message = self.name + ": " + client_input
