@@ -112,7 +112,6 @@ class Server:
                     client_socket.send(f"File {filename} uploaded successfully".encode(ENC))
                     print(f"Received {filename} from {client_name} via data connection")
                     continue
-
                 else:
                     self.broadcast_message(client_name, client_message)
 
