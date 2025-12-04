@@ -11,30 +11,38 @@ Names and email addresses of all
 
 The programming language you use (e.g. C++, Java, or Python)
 - Python
+  
+## PREREQS
+- Python installed
+- all files downloaded in same folder/directory
 
 ### To Run: 
-ON MAC: 
+ON MacOS: 
 1. Make sure all files are downloaded and in a trusted folder
 2. open multiple terminals (if 3 chats needed open 4)
 3. In each terminal, locate the directory in which all files are in
-   - example: `/Users/Desktop/myTrustedFile`
-4. Run the server file with the following code in the first terminal to open the server port
+   - example: `cd /Users/Desktop/myTrustedFile`
+4. Run the server file with the following code in the first terminal to open the server port:
    - `python3 server.py`
-5. Run the client on each of the other terminals
+5. Run the client on each of the other terminals:
    - `python3 client.py`
-6. Once logged in, it should prompt for a name like so:
+6. Once logged in, it should prompt for a display name like so:
    - `Enter your name: `
 7. Once name has been entered you can send and recieve messages
    - if you are logged in on one terminal 1 and run the client.py on terminal 2 and enter your name the following will show on terminal 1:
    - $${\color{red}X \space \color{red}has \space \color{red}joined \space \color{red}the \space \color{red}chat.}$$
 
 ON WINDOWS: 
- - Same steps as MAC but use:
-    - `python server.py`
-    - `python client.py`
+1. Make sure all files are downloaded and in a trusted folder
+2. Open multiple Command Prompt or PowerShell windows (if 3 chats needed open 4)
+3. In each terminal, locate the directory in which all files are in
+   - example: `cd C:\project\path\Desktop\myTrustedFile`
+4. Run the server file with the following code in the first terminal to open the server port:
+   - `python server.py`
+5. Run the client on each of the other terminals:
+   - `python client.py`
 
-
-
+##FTP Functionality
 Add this part if we do FTP: 
 - ***Important commands***
   - **/get** ~ Downloads file from the server folder to client folder
