@@ -9,6 +9,7 @@ Names and email addresses of all
 
 - Ian Martines | b.ianmartinez98@csu.fullerton.edu
 
+- Kiara Guerra | kguerra3411@csu.fullerton.edu
 The programming language you use (e.g. C++, Java, or Python)
 - Python
   
