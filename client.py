@@ -34,9 +34,8 @@ class Client:
                 time.sleep(0.05) 
                 self.socket.send(b"/ls")
                 
-                # Receive with retries
                 response = None
-                for _ in range(50):  # Try for up to 5 seconds
+                for _ in range(50):  
                     try:
                         response = self.socket.recv(65536).decode(ENC)
                         break
@@ -122,6 +121,11 @@ class Client:
                 data_socket.close()
                 print(f"Uploaded {filename} ({filesize} bytes) to server")
                 continue
+            if client_input.startswith("/exit"):
+                print("Exiting...")
+                self.socket.close()
+                os._exit(0)
+
 
             client_message = self.name + ": " + client_input
             self.socket.send(client_message.encode())
