@@ -26,7 +26,7 @@ ON MAC:
    - `Enter your name: `
 7. Once name has been entered you can send and recieve messages
    - if you are logged in on one terminal 1 and run the client.py on terminal 2 and enter your name the following will show on terminal 1:
-   - $${\color{red}X}$$ $${\color{red}has}$$ $${\color{red}joined}$$ $${\color{red}the}$$  $${\color{red}chat.}$$
+   - $${\color{red}X \space \color{red}has \space \color{red}joined \space \color{red}the \space \color{red}chat.}$$
 
 ON WINDOWS: 
  - Same steps as MAC but use:
