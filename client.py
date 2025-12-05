@@ -5,7 +5,7 @@ import time
 
 BUFFER_SIZE = 4096
 ENC = 'utf-8'
-SERVER_IP = '52.53.179.251'
+SERVER_IP = '54.219.89.6'
 SERVER_PORT = 12345
 
 class Client:
