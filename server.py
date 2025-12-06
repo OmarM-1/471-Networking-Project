@@ -1,24 +1,40 @@
-import socket   
+import socket
 from threading import Thread
 import os
 import random
+import boto3
+from botocore.exceptions import ClientError
+import io
 
-BUFFER_SIZE = 4096      
+BUFFER_SIZE = 4096
 ENC = 'utf-8'
 # Define a port range for data connections (configure these in AWS Security Group)
 DATA_PORT_MIN = 30000
 DATA_PORT_MAX = 40000
 
-class Server: 
+# AWS S3 Configuration
+S3_BUCKET_NAME = 'cpsc-471'
+S3_REGION = 'us-west-1'
+
+class Server:
     Clients = []
 
     def __init__(self, HOST, PORT):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.bind((HOST, PORT))
         self.socket.listen(5)
-        self.server_directory = './server_files'
-        if not os.path.exists(self.server_directory):
-            os.makedirs(self.server_directory)
+
+        # Initialize S3 client
+        try:
+            self.s3_client = boto3.client('s3', region_name=S3_REGION)
+            # Test connection
+            self.s3_client.head_bucket(Bucket=S3_BUCKET_NAME)
+            print(f"Connected to S3 bucket: {S3_BUCKET_NAME}")
+        except ClientError as e:
+            print(f"Error connecting to S3: {e}")
+            print("Make sure AWS credentials are configured and bucket exists")
+            raise
+
         self.used_ports = set()
         print(f"Server started on {HOST}:{PORT}")
         print(f"Data port range: {DATA_PORT_MIN}-{DATA_PORT_MAX}")
@@ -43,6 +59,42 @@ class Server:
     def release_port(self, port):
         """Release a port back to the pool"""
         self.used_ports.discard(port)
+
+    def list_s3_files(self):
+        """List all files in the S3 bucket"""
+        try:
+            response = self.s3_client.list_objects_v2(Bucket=S3_BUCKET_NAME)
+            if 'Contents' in response:
+                files = [obj['Key'] for obj in response['Contents']]
+                return files
+            else:
+                return []
+        except ClientError as e:
+            print(f"Error listing S3 files: {e}")
+            return []
+
+    def download_from_s3(self, filename):
+        """Download file from S3 and return bytes"""
+        try:
+            response = self.s3_client.get_object(Bucket=S3_BUCKET_NAME, Key=filename)
+            file_bytes = response['Body'].read()
+            return file_bytes
+        except ClientError as e:
+            print(f"Error downloading from S3: {e}")
+            return None
+
+    def upload_to_s3(self, filename, file_bytes):
+        """Upload file bytes to S3"""
+        try:
+            self.s3_client.put_object(
+                Bucket=S3_BUCKET_NAME,
+                Key=filename,
+                Body=file_bytes
+            )
+            return True
+        except ClientError as e:
+            print(f"Error uploading to S3: {e}")
+            return False
 
     def listen(self):
         try:
@@ -74,33 +126,35 @@ class Server:
                     Server.Clients.remove(client)
                 client_socket.close()
                 break
-                
+
             if not client_message.strip():
                 self.broadcast_message(client_name, client_name + " has left the chat.")
                 if client in Server.Clients:
                     Server.Clients.remove(client)
                 client_socket.close()
                 break
-                
+
             if client_message.strip() == "/ls":
-                files = [f for f in os.listdir(self.server_directory) if not f.startswith('.')]
+                # List files from S3
+                files = self.list_s3_files()
                 filelist = "\n".join(files) if files else "(no files)"
                 client_socket.send(filelist.encode(ENC))
                 continue
-                
+
             elif client_message.startswith("/get "):
-                # PASSIVE MODE: Server creates listening socket and tells client the port
+                # Download from S3 and send to client
                 _, filename = client_message.split(" ", 1)
                 filename = filename.strip()
-                
-                filepath = os.path.join(self.server_directory, filename)
-                
-                if not os.path.exists(filepath) or not os.path.isfile(filepath):
+
+                # Download from S3
+                file_bytes = self.download_from_s3(filename)
+
+                if file_bytes is None:
                     client_socket.send("NOT_FOUND".encode(ENC))
                     continue
-                
-                filesize = os.path.getsize(filepath)
-                
+
+                filesize = len(file_bytes)
+
                 # Get a port from our range
                 try:
                     data_port = self.get_data_port()
@@ -108,31 +162,31 @@ class Server:
                     print(f"Error getting data port: {e}")
                     client_socket.send("ERROR".encode(ENC))
                     continue
-                
+
                 # Create data socket on the assigned port
                 data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 data_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 data_socket.bind(('', data_port))
                 data_socket.listen(1)
                 data_socket.settimeout(30)  # 30 second timeout
-                
+
                 # Tell client the port and filesize
                 client_socket.send(f"FOUND {filesize} {data_port}".encode(ENC))
-                
+
                 try:
                     # Wait for client to connect
                     conn, addr = data_socket.accept()
-                    
+
                     # Send file
-                    with open(filepath, "rb") as f:
-                        while True:
-                            chunk = f.read(BUFFER_SIZE)
-                            if not chunk:
-                                break
-                            conn.sendall(chunk)
-                    
+                    sent = 0
+                    while sent < filesize:
+                        chunk_size = min(BUFFER_SIZE, filesize - sent)
+                        chunk = file_bytes[sent:sent + chunk_size]
+                        conn.sendall(chunk)
+                        sent += len(chunk)
+
                     conn.close()
-                    print(f"Sent {filename} to {client_name} via data connection on port {data_port}")
+                    print(f"Sent {filename} from S3 to {client_name} via data connection on port {data_port}")
                 except socket.timeout:
                     print(f"Timeout waiting for client connection on port {data_port}")
                 except Exception as e:
@@ -141,13 +195,13 @@ class Server:
                     data_socket.close()
                     self.release_port(data_port)
                 continue
-                
+
             elif client_message.startswith("/put "):
-                # PASSIVE MODE: Server creates listening socket and tells client the port
+                # Receive from client and upload to S3
                 parts = client_message.split(" ", 2)
                 filename = parts[1]
                 filesize = int(parts[2])
-                
+
                 # Get a port from our range
                 try:
                     data_port = self.get_data_port()
@@ -155,21 +209,21 @@ class Server:
                     print(f"Error getting data port: {e}")
                     client_socket.send("ERROR".encode(ENC))
                     continue
-                
+
                 # Create data socket on the assigned port
                 data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 data_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 data_socket.bind(('', data_port))
                 data_socket.listen(1)
                 data_socket.settimeout(30)  # 30 second timeout
-                
+
                 # Tell client we're ready and which port to connect to
                 client_socket.send(f"READY {data_port}".encode(ENC))
-                
+
                 try:
                     # Wait for client to connect
                     conn, addr = data_socket.accept()
-                    
+
                     # Receive file
                     file_bytes = b''
                     while len(file_bytes) < filesize:
@@ -177,13 +231,15 @@ class Server:
                         if not chunk:
                             break
                         file_bytes += chunk
-                    
-                    filepath = os.path.join(self.server_directory, filename)
-                    with open(filepath, "wb") as f:
-                        f.write(file_bytes)
-                    
+
                     conn.close()
-                    print(f"Received {filename} ({len(file_bytes)}/{filesize} bytes) from {client_name} via port {data_port}")
+
+                    # Upload to S3
+                    if self.upload_to_s3(filename, file_bytes):
+                        print(f"Received {filename} ({len(file_bytes)}/{filesize} bytes) from {client_name} and uploaded to S3")
+                    else:
+                        print(f"Failed to upload {filename} to S3")
+
                 except socket.timeout:
                     print(f"Timeout waiting for client connection on port {data_port}")
                 except Exception as e:
