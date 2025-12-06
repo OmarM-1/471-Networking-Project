@@ -8,7 +8,6 @@ import io
 
 BUFFER_SIZE = 4096
 ENC = 'utf-8'
-# Define a port range for data connections (configure these in AWS Security Group)
 DATA_PORT_MIN = 30000
 DATA_PORT_MAX = 40000
 
@@ -24,7 +23,6 @@ class Server:
         self.socket.bind((HOST, PORT))
         self.socket.listen(5)
 
-        # Initialize S3 client
         try:
             self.s3_client = boto3.client('s3', region_name=S3_REGION)
             # Test connection
